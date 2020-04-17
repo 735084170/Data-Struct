@@ -1,0 +1,314 @@
+#include <stdio.h>
+#include <malloc.h>
+#define TRUE 1
+#define FALSE 0
+#define OK 1
+#define ERROR 0
+#define INFEASIBLE -1
+#define OVERFLOW -2
+typedef int Status;
+
+typedef struct PNode //多项式结点
+{
+    float coef;
+    int expn;
+    PNode *next;
+} ElemType, *Poly;
+
+typedef struct Polynomial
+{
+    Poly head, tail, current;
+    int len;
+};
+
+Status PolynomialCreate(Polynomial &P, int length, float c[], int e[])
+{
+    P.head = (Poly)malloc(sizeof(PNode));
+    if (!P.head)
+        return ERROR;
+    P.current = P.tail = P.head;
+    P.len = length;
+    for (int i = 0; i < length; i++)
+    {
+        Poly q;
+        q = (Poly)malloc(sizeof(PNode));
+        if (!q)
+            return ERROR;
+        q->coef = c[i];
+        q->expn = e[i];
+        if (P.current == P.head)
+            P.head->next = q;
+        else
+            P.current->next = q;
+        q->next = NULL;
+        P.current = q;
+    }
+    P.tail = P.current;
+    return OK;
+}
+Status PolynomialCreate(Polynomial &P, int length)
+{
+    P.head = (Poly)malloc(sizeof(PNode));
+    if (!P.head)
+        return ERROR;
+    P.current = P.tail = P.head;
+    P.len = length;
+    for (int i = 0; i < length; i++)
+    {
+        Poly q;
+        q = (Poly)malloc(sizeof(PNode));
+        if (!q)
+            return ERROR;
+        q->coef = 0;
+        q->expn = 0;
+        if (P.current == P.head)
+            P.head->next = q;
+        else
+            P.current->next = q;
+        q->next = NULL;
+        P.current = q;
+    }
+    P.tail = P.current;
+    return OK;
+}
+Status PolynomialCreate(Polynomial &P)
+{
+    P.head = (Poly)malloc(sizeof(PNode));
+    if (!P.head)
+        return ERROR;
+    P.current = P.tail = P.head;
+    P.len = 0;
+    P.head->next = NULL;
+    P.current->next = NULL;
+    P.tail->next = NULL;
+    return OK;
+}
+Status ElemDelete(Polynomial &P, Poly q)
+{
+    Poly ph = P.head->next;
+    while (ph)
+    {
+        if (ph->next == q)
+        {
+            ph->next = q->next;
+            free(q);
+            return OK;
+        }
+    }
+    return ERROR;
+}
+Status InsertByExpn(Polynomial &P, int e, float c)
+{
+    Poly q, ph = P.head->next;
+    P.len++;
+    q = (Poly)malloc(sizeof(PNode));
+    if (!q)
+        return ERROR;
+    q->coef = c;
+    q->expn = e;
+    while (ph)
+    {
+        if (q->expn < ph->expn)
+        {
+            if (ph->next == NULL || ph->next->expn < q->expn)
+            {
+                q->next = ph->next;
+                ph->next = q;
+                return OK;
+            }
+            ph = ph->next;
+        }
+        else
+        {
+            q->next = ph;
+            P.head->next = q;
+            return OK;
+        }
+    }
+    P.tail->next = q;
+    q->next = NULL;
+    P.tail = q;
+    return OK;
+}
+Status LocateElemAdd(Polynomial &a, int e, float c)
+{
+    Poly q = a.head->next;
+    while (q)
+    {
+        if (q->expn == e)
+        {
+            q->coef += c;
+            if (q->coef == 0)
+                ElemDelete(a, q);
+            return OK;
+        }
+        q = q->next;
+    }
+    if (!q)
+        return ERROR;
+}
+Status PolynomialAdd(Polynomial a, Polynomial b, Polynomial &c)
+{
+    PolynomialCreate(c, a.len + b.len);
+    c.len = 0;
+    Poly pa = a.head->next, pb = b.head->next, pc = c.head->next;
+    while (pa && pb)
+    {
+        if (pa->expn == pb->expn)
+        {
+            if (pa->coef + pb->coef == 0)
+            {
+                pa = pa->next;
+                pb = pb->next;
+            }
+            else
+            {
+                pc->expn = pa->expn;
+                pc->coef = pa->coef + pb->coef;
+                pa = pa->next;
+                pb = pb->next;
+                pc = pc->next;
+                c.len++;
+            }
+        }
+        else if (pa->expn > pb->expn)
+        {
+            pc->coef = pa->coef;
+            pc->expn = pa->expn;
+            pc = pc->next;
+            c.len++;
+            pa = pa->next;
+        }
+        else
+        {
+            pc->coef = pb->coef;
+            pc->expn = pb->expn;
+            pc = pc->next;
+            c.len++;
+            pb = pb->next;
+        }
+    }
+    if (pa)
+    {
+        while (pa)
+        {
+            pc->coef = pa->coef;
+            pc->expn = pa->expn;
+            pc = pc->next;
+            c.len++;
+            pa = pa->next;
+        }
+    }
+    if (pb)
+    {
+        while (pb)
+        {
+            pc->coef = pb->coef;
+            pc->expn = pb->expn;
+            pc = pc->next;
+            c.len++;
+            pb = pb->next;
+        }
+    }
+}
+Status PolynomialMult(Polynomial a, Polynomial b, Polynomial &c)
+{
+    Poly pa = a.head->next, pb = b.head->next, pc = c.head->next;
+    PolynomialCreate(c);
+    while (pa)
+    {
+        while (pb)
+        {
+            float cc = pa->coef * pb->coef;
+            int ce = pa->expn + pb->expn;
+            Poly p;
+            if (!LocateElemAdd(c, ce, cc))
+                InsertByExpn(c, ce, cc);
+            pb = pb->next;
+        }
+        pb = b.head->next;
+        pa = pa->next;
+    }
+}
+Status PolynomialPrint(Polynomial a)
+{
+    Poly p = a.head->next;
+    if (p->coef != 1)
+        printf("%.1fX%d", p->coef, p->expn);
+    else
+    {
+        if (p->coef < 0)
+            printf("-");
+        printf("X%d", p->expn);
+    }
+    a.len--;
+    p = p->next;
+    while (a.len)
+    {
+        if (p->expn == 0)
+        {
+            if (p->coef > 0)
+                printf("+%.1f", p->coef);
+            else
+                printf("%.1f", p->coef);
+        }
+        else
+        {
+
+            if (p->coef > 0)
+            {
+                if (p->coef == 1)
+                    printf("+X");
+                else
+                    printf("+%.1fX", p->coef);
+            }
+            else
+            {
+                if (p->coef == -1)
+                    printf("-X");
+                else
+                    printf("%.1fX", p->coef);
+            }
+            if (p->expn != 1)
+                printf("%d", p->expn);
+        }
+        a.len--;
+        p = p->next;
+    }
+    printf("\n");
+}
+int main()
+{
+    Polynomial A, B, C, D;
+    int ae[100], be[100], al = 0, bl = 0;
+    float ac[100], bc[100];
+    char c = '/0';
+    while (c != '\n')
+    {
+        scanf("%f %d", &ac[al], &ae[al]);
+        al++;
+        c = getchar();
+    }
+    c = '\0';
+    while (c != '\n')
+    {
+        scanf("%f %d", &bc[bl], &be[bl]);
+        bl++;
+        c = getchar();
+    }
+    PolynomialCreate(A, al, ac, ae);
+    PolynomialCreate(B, bl, bc, be);
+    PolynomialAdd(A, B, C);
+    printf("P(x)=");
+    PolynomialPrint(A);
+    printf("Q(x)=");
+    PolynomialPrint(B);
+    printf("The sum of two polynomials is ");
+    PolynomialPrint(C);
+    PolynomialMult(A, B, D);
+    printf("The mult of two polynomials is ");
+    PolynomialPrint(D);
+    getchar();
+    getchar();
+    getchar();
+}
