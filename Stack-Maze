@@ -1,0 +1,319 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define STACK_INIT_SIZE 100 //定义栈的初始大小
+
+#define STACKINCREMENT 10 //定义栈的储存增量
+
+#define TRUE 1 //函数返回值
+
+#define FALSE 0
+
+#define OK 1
+
+#define ERROR 0
+
+#define INFEASIBLE -1
+
+#define OVERFLOW -2
+
+#define RANGE 100 //迷宫大小
+
+#define ROW 10 //迷宫行数
+
+#define COL 10 //迷宫列数
+
+typedef int Status;
+
+typedef struct
+{
+    int m, n;
+    int arr[RANGE][RANGE]; //迷宫数组
+} MazeType;                //迷宫类型
+
+typedef struct
+{
+    int row; //迷宫中的行
+    int col; //迷宫中的列
+} PosType;   //坐标位置
+
+typedef struct
+{
+    int ord;      //当前位置在路径上的“序号”
+    PosType seat; //当前的坐标位置
+    int di;       //往下一个坐标位置的方向，1=右，2=下，3=左，4=上
+} SElemType;      //栈的元素类型
+
+typedef struct
+{
+    SElemType *base; //栈底
+    SElemType *top;  //栈顶
+    int stacksize;   //栈的大小
+} SqStack;           //定义栈
+
+//初始化栈
+Status InitStack(SqStack &S)
+{
+    S.base = (SElemType *)malloc(STACK_INIT_SIZE * sizeof(SElemType));
+    if (!S.base)
+        exit(OVERFLOW);
+    S.top = S.base;
+    S.stacksize = STACK_INIT_SIZE;
+    return OK;
+}
+
+//销毁栈
+Status DestroyStack(SqStack &S)
+{
+    free(&S); //释放栈S的空间
+    return TRUE;
+}
+
+//清空栈
+Status ClearStack(SqStack &S)
+{
+}
+
+//判断栈是否为空栈
+Status IsStackEmpty(SqStack S)
+{
+    return S.base == S.top;
+}
+
+//获得栈内元素的个数
+int StackLength(SqStack &S)
+{
+    return S.top - S.base;
+}
+
+//当栈不为空时，返回栈顶e
+Status GetTop(SqStack S, SElemType &e)
+{
+    if (S.base == S.top)
+        return ERROR;
+    e = *(S.top - 1);
+    return OK;
+}
+//将e压入栈S
+Status Push(SqStack &S, SElemType e)
+{
+    if (S.top - S.base >= S.stacksize) //若栈已满，追加储存空间
+    {
+        S.base = (SElemType *)realloc(S.base, (S.stacksize + STACKINCREMENT) * sizeof(SElemType));
+        if (!S.base)
+            exit(OVERFLOW);
+        S.top = S.base + S.stacksize;
+        S.stacksize = S.stacksize + STACKINCREMENT;
+    }
+    *S.top++ = e;
+    return OK;
+}
+//将栈顶元素弹出，保存在e中
+Status Pop(SqStack &S, SElemType &e)
+{
+    if (S.top == S.base) //当栈空时，返回错误
+        return ERROR;
+    e = *--S.top;
+    return OK;
+}
+
+//初始化迷宫
+Status InitMaze(MazeType &maze, int a[ROW][COL], int row, int col)
+{
+    int i, j; //设置迷宫maze的初值，包括加上边缘一圈的值
+    //内部
+    for (int i = 1; i < row - 1; i++)
+    {
+        for (int j = 1; j < col - 1; j++)
+        {
+            maze.arr[i][j] = a[i][j];
+        }
+    }
+    //围墙
+    for (int j = 0; j < row; j++)
+    {
+        maze.arr[0][j] = 1;
+        maze.arr[row - 1][j] = 1;
+    }
+    for (int i = 0; i < col; i++)
+    {
+        maze.arr[i][0] = 1;
+        maze.arr[i][col - 1] = 1;
+    }
+    return OK;
+}
+
+//判断当前位置是否可通
+bool Pass(MazeType maze, PosType pos)
+{
+    if (maze.arr[pos.row][pos.col] == 0)
+        return true;
+    else
+        return false;
+}
+
+//留下足迹
+void FootPrint(MazeType &maze, PosType pos)
+{
+    maze.arr[pos.row][pos.col] = 2; //2是走过且通的路
+}
+
+//标记为死路
+void MakePrint(MazeType &maze, PosType pos)
+{
+    maze.arr[pos.row][pos.col] = 3; //3是死路
+}
+
+//返回当前位置的下一位置
+PosType NextPos(PosType pos, int di)
+{
+    PosType nextpos = pos;
+    switch (di)
+    {
+    case 1:
+        nextpos.col++; //右
+        break;
+    case 2:
+        nextpos.row++; //下
+        break;
+    case 3:
+        nextpos.col--; //左
+        break;
+    case 4:
+        nextpos.row--; //上
+        break;
+    }
+    return nextpos;
+}
+Status MazePath(MazeType &maze, PosType start, PosType end)
+{
+    SqStack S;
+    PosType curpos;
+    int curstep;
+    InitStack(S);
+    curpos = start;
+    curstep = 1;
+    do
+    {
+        if (Pass(maze, curpos))
+        {
+            //留下足迹
+            FootPrint(maze, curpos);
+            SElemType e = {curstep, curpos, 1};
+            Push(S, e);
+            //当且位置就是终点，找到出口
+            if (curpos.row == end.row && curpos.col == end.col)
+                return TRUE;
+            //否则，向右找下一位置
+            curpos = NextPos(curpos, 1);
+            curstep++;
+        }
+        //不可通
+        else
+        {
+            if (!IsStackEmpty(S))
+            {
+                SElemType e;
+                Pop(S, e);
+                while (e.di == 4 && !IsStackEmpty(S))
+                {
+                    MakePrint(maze, e.seat);
+                    Pop(S, e);
+                }
+                if (e.di < 4)
+                {
+                    e.di++;
+                    Push(S, e);
+                    curpos = NextPos(e.seat, e.di);
+                }
+            }
+        }
+
+    } while (!IsStackEmpty(S));
+    return FALSE;
+}
+
+//打印路径
+void PrintMaze(MazeType maze, int row, int col)
+{
+    int i, j;
+    printf(" ");
+    for (i = 0; i < row; i++) //打印列数名
+        printf("%d ", i);
+    printf("\n");
+    for (i = 0; i < row; i++)
+    {
+        printf("%d", i); //打印行数名
+        for (j = 0; j < col; j++)
+        {
+            if (i==1&&j==1)
+            {
+                printf("S ");
+            }
+            else if(i==8&&j==8)
+            {
+                printf("G ");
+            }
+            else
+            {
+                switch (maze.arr[i][j])
+                {
+                case 0:
+                    printf("  "); //没走过
+                    break;
+                case 1:
+                    printf("■"); //墙
+                    break;
+                case 2:
+                    printf("* "); //走过且走得通
+                    break;
+                case 3:
+                    printf("@ "); //走过，死路
+                    break;
+                }
+            }
+        }
+        printf("\n");
+    }
+}
+
+int main()
+{
+    int a[ROW][COL] = {
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        {1, 0, 0, 1, 0, 0, 0, 1, 0, 1},
+        {1, 0, 0, 1, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
+        {1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
+        {1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
+        {1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
+        {1, 0, 0, 1, 0, 0, 1, 1, 0, 1},
+        {1, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    };
+    PosType start = {1, 1}, end = {8, 8}; //给定起点，终点
+    MazeType maze;
+    InitMaze(maze, a, ROW, COL); //初始化迷宫
+
+    printf("\n-----------------------------------------\n");
+    printf("\n原始迷宫如下：\n");
+    printf("('S'代表起点，'G'代表终点)\n");
+    PrintMaze(maze, ROW, COL);
+
+    if (MazePath(maze, start, end))
+    {
+        printf("\n-----------------------------------------\n");
+        printf("\n求解迷宫路径如下：\n");
+        printf("('S'代表起点，'G'代表终点)\n");
+        printf("(其中'*'表示求解路径，'@'表示死路)\n");
+        PrintMaze(maze, ROW, COL); //输出迷宫
+    }
+    else
+    {
+        printf("\n------------------没有通路-------------------\n");
+    }
+
+    getchar();
+    getchar();
+    getchar();
+}
